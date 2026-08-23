@@ -24,8 +24,8 @@ PoC поиска фотографий по текстовому описанию
 | Компонент | Технология |
 |---|---|
 | Эмбеддинги изображений | ResNet50 (PyTorch, ImageNet), **2048** dim |
-| Эмбеддинги текста | TF-IDF (uni/bi-grams), **500** dim |
-| Модель сходства | LinearRegression, Ridge, **MLP (512→256→128)** |
+| Эмбеддинги текста | **all-MiniLM-L6-v2** (sentence-transformers), **384** dim |
+| Модель сходства | DummyRegressor, LinearRegression, Ridge, **MLP (128)** |
 | Метрика | MAE (основная), ROC-AUC |
 | Split | GroupShuffleSplit по `image_id` (70/30) |
 
@@ -33,9 +33,9 @@ PoC поиска фотографий по текстовому описанию
 
 | Модель | MAE (val) | ROC-AUC |
 |---|:---:|:---:|
-| LinearRegression | 0.217 | 0.634 |
-| Ridge (α=10) | 0.216 | 0.636 |
-| **MLP (512,256,128)** | **0.191** | **0.704** |
+| DummyRegressor | 0.214 | 0.500 |
+| Ridge (α=10) | 0.197 | 0.723 |
+| **MLP (128)** | **0.163** | **0.836** |
 
 Top-1 на 10 случайных тестовых запросах: **0/10** — ожидаемо для PoC без CLIP/BERT.
 
@@ -51,7 +51,7 @@ Top-1 на 10 случайных тестовых запросах: **0/10** —
 │   ├── train_images/             # 1000 jpg
 │   └── test_images/              # 100 jpg
 ├── notebooks/
-│   └── image_search_poc.ipynb    # основной ноутбук
+│   └── Артём_Цыганцов_v1.ipynb   # основной ноутбук (с ревью)
 ├── scripts/
 │   └── download_dataset.py
 ├── cache/                        # кэш эмбеддингов (gitignore)
@@ -72,7 +72,7 @@ pip install -r requirements.txt
 # если data/ пустой:
 python scripts/download_dataset.py
 
-jupyter notebook notebooks/image_search_poc.ipynb
+jupyter notebook "notebooks/Артём_Цыганцов_v1.ipynb"
 ```
 
 Первый прогон ResNet50 на CPU: ~15–20 мин. Повторные запуски — секунды (кэш в `cache/`).
@@ -80,8 +80,8 @@ jupyter notebook notebooks/image_search_poc.ipynb
 ## Пайплайн
 
 1. **EDA** — голосование экспертов 2/3, target = 0.6×expert + 0.4×crowd
-2. **Фильтрация** — исключение изображений с детьми по ключевым словам
-3. **Векторизация** — ResNet50 + TF-IDF → concat **2548** признаков
+2. **Фильтрация** — исключение ~288 изображений с детьми (query_id)
+3. **Векторизация** — ResNet50 + MiniLM → L2-norm → concat **2432** признаков
 4. **Обучение** — сравнение линейных моделей и MLP, выбор лучшей по MAE
 5. **Поиск** — `search_image()` + юридический дисклеймер
 
@@ -98,7 +98,7 @@ jupyter notebook notebooks/image_search_poc.ipynb
 
 ## Ограничения
 
-- TF-IDF + ResNet50 не выровнены в общем embedding-space (в отличие от CLIP)
+- MiniLM + ResNet50 не выровнены в общем embedding-space (в отличие от CLIP)
 - PoC, не production-ready
 - Датасет — только для обучения
 
