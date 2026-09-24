@@ -1,23 +1,19 @@
-# Данные проекта
+# Data
 
-Файлы разметки и изображения для PoC поиска фото по тексту.
+Paired captions, expert/crowd scores, and two image folders.
 
-## Структура
-
-| Файл / папка | Описание |
+| Path | What |
 |---|---|
-| `train_dataset.csv` | пары image — query_id — query_text для обучения |
-| `CrowdAnnotations.tsv` | краудсорсинговые оценки соответствия |
-| `ExpertAnnotations.tsv` | экспертные оценки (1–4) |
-| `test_queries.csv` | тестовые запросы и эталонные изображения |
-| `test_images.csv` | список тестовых изображений |
-| `train_images/` | 1000 обучающих изображений |
-| `test_images/` | 100 тестовых изображений |
-
-## Скачать заново
+| `train_dataset.csv` | image, query_id, query_text (5 822 rows) |
+| `ExpertAnnotations.tsv` | three 1–4 scores per pair |
+| `CrowdAnnotations.tsv` | yes-share per pair |
+| `test_queries.csv` | hold-out captions |
+| `test_images.csv` | 100 test filenames |
+| `train_images/` | 1 000 jpg |
+| `test_images/` | 100 jpg |
 
 ```bash
 python scripts/download_dataset.py
 ```
 
-Источник: [dsplus_integrated_project_4.zip](https://code.s3.yandex.net/datasets/dsplus_integrated_project_4.zip)
+Archive: [dsplus_integrated_project_4.zip](https://code.s3.yandex.net/datasets/dsplus_integrated_project_4.zip)

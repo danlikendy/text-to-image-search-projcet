@@ -1,111 +1,73 @@
-# Text-to-Image Search PoC
+# Rank photos by a sentence
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-ResNet50-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-MLP%20%7C%20Ridge-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
-[![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-F37626?logo=jupyter&logoColor=white)](https://jupyter.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+A catalog query: English caption in, a relevance score in `[0, 1]` out, top-1 image from the gallery. Image tower is frozen **ResNet50** (ImageNet). Text tower is **all-MiniLM-L6-v2**. A small **MLP** reads the concatenated L2-normalized pair.
 
-PoC поиска фотографий по текстовому описанию для фотохостинга **With Sense**.
+Live write-up: **[danlikendy.github.io/text-to-image-search-projcet](https://danlikendy.github.io/text-to-image-search-projcet/)**
 
-Пользователь вводит описание сцены — модель возвращает число от 0 до 1 (степень соответствия) и находит наиболее релевантное изображение в каталоге.
+This is **not** CLIP. The two towers never saw each other during pretraining. The MLP is what has to learn the joint space. Retrieval top-1 on a 100-image hold-out is weak; ranking MAE is where the work actually shows.
 
-> Учебный проект Yandex Practicum · Data Science · multimodal retrieval
+Queries that mention children are refused (legal constraint on the catalog).
 
-## Demo
+---
 
-| Вход | Выход |
+## Problem
+
+**5 822** image–caption pairs on **1 000** photos. Three experts score match on a 1–4 scale; crowd gives a yes-share. Experts disagree on a slice of pairs — I drop those (need 2-of-3). Target is `0.6 × expert + 0.4 × crowd` when crowd exists, else expert only, mapped to `[0, 1]`. Mean target sits around **0.17**: most captions are a poor match. A dummy predictor is already “pretty good” on MAE. You have to beat that.
+
+**288** images leave the train set because their `query_id` captions talk about children. That is prefix-of-`query_id`, not a vision detector.
+
+## What I shipped
+
+| Piece | Choice |
 |---|---|
-| Текстовый запрос на английском | Top-1 изображение из `test_images/` |
-| Запрос с контентом о детях | Дисклеймер вместо результата |
+| Image | ResNet50, 2048-d, frozen |
+| Text | MiniLM-L6-v2, 384-d (not TF-IDF — tried, lost) |
+| Features | L2 per tower, concat **2432** |
+| Split | `GroupShuffleSplit` on `image_id`, 70/30 — no photo in both sides |
+| Metric | **MAE** (primary), ROC-AUC on a high/low cut |
+| Model | Dummy → Ridge → MLP. Winner: **MLP (128)** |
 
-## Стек
-
-| Компонент | Технология |
-|---|---|
-| Эмбеддинги изображений | ResNet50 (PyTorch, ImageNet), **2048** dim |
-| Эмбеддинги текста | **all-MiniLM-L6-v2** (sentence-transformers), **384** dim |
-| Модель сходства | DummyRegressor, LinearRegression, Ridge, **MLP (128)** |
-| Метрика | MAE (основная), ROC-AUC |
-| Split | GroupShuffleSplit по `image_id` (70/30) |
-
-## Результаты
-
-| Модель | MAE (val) | ROC-AUC |
-|---|:---:|:---:|
+| Model | MAE (val) | ROC-AUC |
+|---|---:|---:|
 | DummyRegressor | 0.214 | 0.500 |
 | Ridge (α=10) | 0.197 | 0.723 |
 | **MLP (128)** | **0.163** | **0.836** |
 
-Top-1 на 10 случайных тестовых запросах: **0/10** — ожидаемо для PoC без CLIP/BERT.
+Ten random test queries, top-1 vs the labeled photo: **0/10**. Expected with unaligned towers. I leave the number here so nobody reads 0.836 AUC as “the search works.”
 
-## Структура
-
-```
-.
-├── data/                         # датасет (разметка + изображения)
-│   ├── train_dataset.csv
-│   ├── ExpertAnnotations.tsv
-│   ├── CrowdAnnotations.tsv
-│   ├── test_queries.csv
-│   ├── train_images/             # 1000 jpg
-│   └── test_images/              # 100 jpg
-├── notebooks/
-│   └── Артём_Цыганцов_v1.ipynb   # основной ноутбук (с ревью)
-├── scripts/
-│   └── download_dataset.py
-├── cache/                        # кэш эмбеддингов (gitignore)
-├── requirements.txt
-└── LICENSE
-```
-
-## Быстрый старт
+## Run
 
 ```bash
-git clone https://github.com/danlikendy/text-to-image-search-projcet.git
-cd text-to-image-search-projcet
-
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# если data/ пустой:
-python scripts/download_dataset.py
-
-jupyter notebook "notebooks/Артём_Цыганцов_v1.ipynb"
+python scripts/download_dataset.py   # if data/ is empty
+pytest tests/ -q
 ```
 
-Первый прогон ResNet50 на CPU: ~15–20 мин. Повторные запуски — секунды (кэш в `cache/`).
+Notebook (EDA + encode + train + demo search): `notebooks/eda_and_training.ipynb`. First ResNet pass on CPU is ~15–20 min; embeddings cache under `cache/`.
 
-## Пайплайн
+After you dump `artifacts/mlp.joblib` + normalizers and `cache/test_image_embeddings.npz`:
 
-1. **EDA** — голосование экспертов 2/3, target = 0.6×expert + 0.4×crowd
-2. **Фильтрация** — исключение ~288 изображений с детьми (query_id)
-3. **Векторизация** — ResNet50 + MiniLM → L2-norm → concat **2432** признаков
-4. **Обучение** — сравнение линейных моделей и MLP, выбор лучшей по MAE
-5. **Поиск** — `search_image()` + юридический дисклеймер
+```bash
+python scripts/search.py "A brown dog sits in long grass."
+```
 
-## Данные
+Child-mention query prints the legal refusal string instead of a filename.
 
-| Файл | Описание |
-|---|---|
-| `train_dataset.csv` | 5822 пары image + текст |
-| `ExpertAnnotations.tsv` | оценки 3 экспертов (1–4) |
-| `CrowdAnnotations.tsv` | краудсорсинговые оценки |
-| `test_queries.csv` | 499 тестовых запросов |
+More: [docs/RUN.md](docs/RUN.md) · [docs/API.md](docs/API.md)
 
-Источник: [dsplus_integrated_project_4.zip](https://code.s3.yandex.net/datasets/dsplus_integrated_project_4.zip) · подробнее в [data/README.md](data/README.md)
+## Layout
 
-## Ограничения
+```
+src/           labels, child filter, SearchIndex
+scripts/       download dataset, CLI search
+notebooks/     full training path
+tests/         labels + filter (no GPU)
+data/          pairs, expert/crowd TSV, jpg catalogs
+```
 
-- MiniLM + ResNet50 не выровнены в общем embedding-space (в отличие от CLIP)
-- PoC, не production-ready
-- Датасет — только для обучения
+`cache/` and `artifacts/` are gitignored.
 
-## Автор
+---
 
-[danlikendy](https://github.com/danlikendy)
-
-## Лицензия
-
-MIT — см. [LICENSE](LICENSE).
+Artem Tsygantsov · [tsygantsov.ru](https://tsygantsov.ru) · MIT
