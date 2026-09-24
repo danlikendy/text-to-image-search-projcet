@@ -1,44 +1,32 @@
-# GitHub — настройки репозитория
-
-Скопируй в **Settings → General → About** на GitHub.
+# GitHub About (paste)
 
 ## Description
 
 ```
-PoC поиска фото по тексту: ResNet50 + TF-IDF + MLP. Jupyter, PyTorch, scikit-learn. Yandex Practicum DS project.
+Rank a photo catalog from an English caption. Frozen ResNet50 + MiniLM, MLP on concat. Val MAE 0.163.
 ```
 
 ## Website
 
 ```
-https://github.com/danlikendy/text-to-image-search-projcet
+https://danlikendy.github.io/text-to-image-search-projcet/
 ```
 
-## Topics (теги)
+## Topics
 
 ```
 machine-learning
-deep-learning
-pytorch
 computer-vision
 nlp
 image-retrieval
-text-to-image
 multimodal
-scikit-learn
-jupyter-notebook
-data-science
-proof-of-concept
+pytorch
 resnet50
-tf-idf
-image-search
-yandex-practicum
+sentence-transformers
+scikit-learn
 python
-neural-networks
+sentence-transformers
+text-to-image
 ```
 
-## Social preview
-
-Title: `Text-to-Image Search PoC`
-
-Subtitle: `ResNet50 + TF-IDF + MLP · поиск фото по текстовому описанию`
+Keep `tf-idf` **off** the topic list — the shipped text tower is MiniLM.

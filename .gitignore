@@ -18,6 +18,7 @@ env/
 
 # Cache & artifacts
 cache/
+artifacts/
 *.pkl
 *.pt
 *.pth
