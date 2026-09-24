@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Text → image ranking — Tsygantsov</title>
+  <meta name="description" content="ResNet50 + MiniLM + MLP. Rank a photo catalog by an English caption. MAE 0.163 on grouped val." />
+  <style>
+    :root {
+      --bg: #12110f;
+      --fg: #e8e2d6;
+      --muted: #9a9284;
+      --line: #2a2722;
+      --accent: #c45c3e;
+      --ok: #c4b48a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    body {
+      font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 20px 80px;
+    }
+    h1 { font-size: 1.55rem; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 8px; }
+    h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ok); margin: 36px 0 10px; font-weight: 600; }
+    p { margin: 0 0 12px; }
+    a { color: var(--fg); }
+    .sub { color: var(--muted); margin-bottom: 28px; }
+    .rule { height: 1px; background: var(--line); margin: 28px 0; }
+    .nums { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media (min-width: 560px) { .nums { grid-template-columns: repeat(4, 1fr); } }
+    .num {
+      border: 1px solid var(--line);
+      padding: 12px 12px 10px;
+    }
+    .num b { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+    .num span { color: var(--muted); font-size: 0.78rem; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 6px 0; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.86rem; }
+    pre {
+      background: #0c0b0a;
+      border: 1px solid var(--line);
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+    .warn { color: var(--accent); font-size: 0.9rem; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 0.85rem; }
+    .links a { margin-right: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Find a photo from a sentence</h1>
+  <p class="sub">Frozen ResNet50 + MiniLM, MLP on the concat. Artem Tsygantsov, 2026.</p>
+  <p class="links">
+    <a href="https://github.com/danlikendy/text-to-image-search-projcet">repo</a>
+    <a href="https://github.com/danlikendy/text-to-image-search-projcet/blob/main/docs/RUN.md">run</a>
+    <a href="https://github.com/danlikendy/text-to-image-search-projcet/blob/main/docs/API.md">api</a>
+  </p>
+
+  <div class="rule"></div>
+
+  <h2>Why it exists</h2>
+  <p>A hosting catalog: user types a scene, you want the closest still. I do not fine-tune a joint embedding. Two off-the-shelf towers, L2 each, 2432 numbers into an MLP. The number I optimize is MAE against a blended expert/crowd score, not Instagram-pretty top-1.</p>
+
+  <h2>Numbers I will defend</h2>
+  <div class="nums">
+    <div class="num"><b>5 822</b><span>train pairs</span></div>
+    <div class="num"><b>1 000</b><span>photos</span></div>
+    <div class="num"><b>0.163</b><span>val MAE (MLP-128)</span></div>
+    <div class="num"><b>0.836</b><span>val ROC-AUC</span></div>
+  </div>
+  <p style="margin-top:14px">Dummy MAE is 0.214. Ridge 0.197. Split is grouped by image so a photo cannot leak into val. Top-1 on 10 random test captions vs the labeled file: <strong>0/10</strong>. The AUC is ranking quality on a pair; it is not “search works.”</p>
+
+  <h2>Constraints</h2>
+  <p>Captions that mention children never return a file. Train drops 288 images whose <span class="mono">query_id</span> captions hit the same regex. This page cannot run ResNet — GitHub Pages is static. Inference is local.</p>
+  <pre>pip install -r requirements.txt
+python scripts/download_dataset.py
+pytest tests/ -q
+python scripts/search.py "A brown dog sits in long grass."</pre>
+
+  <h2>Val table</h2>
+  <table>
+    <thead><tr><th>model</th><th>MAE</th><th>ROC-AUC</th></tr></thead>
+    <tbody>
+      <tr><td>Dummy</td><td>0.214</td><td>0.500</td></tr>
+      <tr><td>Ridge α=10</td><td>0.197</td><td>0.723</td></tr>
+      <tr><td>MLP (128)</td><td>0.163</td><td>0.836</td></tr>
+    </tbody>
+  </table>
+
+  <p class="warn">Not a production retriever. Unaligned towers. No ANN index.</p>
+
+  <footer>
+    MIT · <a href="https://tsygantsov.ru">tsygantsov.ru</a>
+  </footer>
+</body>
+</html>
